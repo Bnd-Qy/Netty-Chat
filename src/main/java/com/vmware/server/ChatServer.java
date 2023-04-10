@@ -1,11 +1,16 @@
 package com.vmware.server;
 
 
+import com.vmware.message.LoginRequestMessage;
+import com.vmware.message.LoginResponseMessage;
 import com.vmware.protocol.MessageCodecSharable;
 import com.vmware.protocol.ProcotolFrameDecoder;
+import com.vmware.server.service.UserServiceFactory;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
+import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
@@ -30,6 +35,15 @@ public class ChatServer {
                     ch.pipeline().addLast(new ProcotolFrameDecoder());
                     ch.pipeline().addLast(LOGGING_HANDLER);
                     ch.pipeline().addLast(MESSAGE_CODEC);
+                    ch.pipeline().addLast(new SimpleChannelInboundHandler<LoginRequestMessage>() {
+                        @Override
+                        protected void channelRead0(ChannelHandlerContext ctx, LoginRequestMessage msg) throws Exception {
+                            String username = msg.getUsername();
+                            String password = msg.getPassword();
+                            boolean login = UserServiceFactory.getUserService().login(username, password);
+                            ctx.channel().writeAndFlush(new LoginResponseMessage(login, login ? "登录成功!" : "登录失败,用户名或密码有误!"));
+                        }
+                    });
                 }
             });
             Channel channel = serverBootstrap.bind(8080).sync().channel();

@@ -13,10 +13,10 @@ public class LoginRequestMessage extends Message {
     public LoginRequestMessage() {
     }
 
-    public LoginRequestMessage(String username, String password, String nickname) {
+    public LoginRequestMessage(String username, String password /*String nickname*/) {
         this.username = username;
         this.password = password;
-        this.nickname = nickname;
+//        this.nickname = nickname;
     }
 
     @Override

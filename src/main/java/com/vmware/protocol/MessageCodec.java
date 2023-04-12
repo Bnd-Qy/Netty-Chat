@@ -24,7 +24,7 @@ public class MessageCodec extends ByteToMessageCodec<Message> {
         // 2. 1 字节的版本,
         out.writeByte(1);
         // 3. 1 字节的序列化方式 jdk 0 , json 1
-        out.writeByte(0);
+        out.writeByte(Config.getSerializerAlgorithm().ordinal());
         // 4. 1 字节的指令类型
         out.writeByte(msg.getMessageType());
         // 5. 4 个字节
@@ -32,10 +32,7 @@ public class MessageCodec extends ByteToMessageCodec<Message> {
         // 无意义，对齐填充
         out.writeByte(0xff);
         // 6. 获取内容的字节数组
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        ObjectOutputStream oos = new ObjectOutputStream(bos);
-        oos.writeObject(msg);
-        byte[] bytes = bos.toByteArray();
+        byte[] bytes = Config.getSerializerAlgorithm().serialize(msg);//序列化
         // 7. 长度
         out.writeInt(bytes.length);
         // 8. 写入内容
@@ -53,8 +50,11 @@ public class MessageCodec extends ByteToMessageCodec<Message> {
         int length = in.readInt();
         byte[] bytes = new byte[length];
         in.readBytes(bytes, 0, length);
-        ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(bytes));
-        Message message = (Message) ois.readObject();
+        // 找到反序列化算法
+        Serializer.Algorithm algorithm = Serializer.Algorithm.values()[serializerType];
+        // 确定具体消息类型
+        Class<? extends Message> messageClass =Message.getMessageClass(messageType);
+        Message message = algorithm.deserialize(messageClass, bytes);
         log.debug("{}, {}, {}, {}, {}, {}", magicNum, version, serializerType, messageType, sequenceId, length);
         log.debug("{}", message);
         out.add(message);

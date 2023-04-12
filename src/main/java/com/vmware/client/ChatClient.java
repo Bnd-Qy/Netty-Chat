@@ -5,15 +5,15 @@ import com.vmware.message.*;
 import com.vmware.protocol.MessageCodecSharable;
 import com.vmware.protocol.ProcotolFrameDecoder;
 import io.netty.bootstrap.Bootstrap;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.channel.ChannelInitializer;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
+import io.netty.handler.timeout.IdleState;
+import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.handler.timeout.IdleStateHandler;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Arrays;
@@ -39,8 +39,23 @@ public class ChatClient {
                 @Override
                 protected void initChannel(SocketChannel ch) throws Exception {
                     ch.pipeline().addLast(new ProcotolFrameDecoder());
-                    ch.pipeline().addLast(LOGGING_HANDLER);
+//                    ch.pipeline().addLast(LOGGING_HANDLER);
                     ch.pipeline().addLast(MESSAGE_CODEC);
+                    //添加心跳机制
+                    ch.pipeline().addLast(new IdleStateHandler(0,3,0));
+                    ch.pipeline().addLast(new ChannelDuplexHandler(){
+                        @Override
+                        public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+                            if (evt instanceof IdleStateEvent){
+                                IdleStateEvent event = (IdleStateEvent) evt;
+                                //超过3s没有写入数据则触发WRITER_IDLE事件
+                                if (IdleState.WRITER_IDLE.equals(event.state())){
+//                                    log.info("发送心跳数据包...");
+                                    ctx.writeAndFlush(new PingMessage());
+                                }
+                            }
+                        }
+                    });
                     ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
                         @Override
                         public void channelActive(ChannelHandlerContext ctx) throws Exception {
@@ -86,6 +101,7 @@ public class ChatClient {
                                                     if (members != null && members.length() > 0) {
                                                         String[] memberList = members.split(",");
                                                         Set<String> memberSet = Arrays.stream(memberList).collect(Collectors.toSet());
+                                                        memberSet.add(username);
                                                         GroupCreateRequestMessage groupCreateRequestMessage = new GroupCreateRequestMessage(commandList[1], memberSet);
                                                         ctx.channel().writeAndFlush(groupCreateRequestMessage);
                                                     }
